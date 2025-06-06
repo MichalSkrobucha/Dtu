@@ -1,10 +1,9 @@
 # https://gist.github.com/bonsaiviking/5571001
+# Lepiej nie brać 1:1 żebyśmy wiedzieli lepiej jak działa nasz AES
 
 import sBox
 
 # block[row, col] = list[4 * row + col]
-
-
 subBox: tuple[chr, ...] = sBox.correctBox
 
 
@@ -17,7 +16,7 @@ def subBytes(data: list[chr]) -> list[chr]:
 
 
 def shiftRows(data: list[chr]) -> list[chr]:
-    # [0, 1, 2, ..., 15] -> [0, 1, 2, 3, 5, 6, 7, 4, 10, 11, 8, 9, 15, 12, 13, 14]
+    # [0, 1, 2, 3 ; 4, ..., 15] -> [0, 1, 2, 3 ; 5, 6, 7, 4 ; 10, 11, 8, 9 ; 15, 12, 13, 14]
     pass
 
 
