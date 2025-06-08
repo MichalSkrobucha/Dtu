@@ -1,6 +1,6 @@
 # https://gist.github.com/bonsaiviking/5571001
 # Lepiej nie brać 1:1 żebyśmy wiedzieli lepiej jak działa nasz AES
-
+#tests
 import sBox
 
 # block[row, col] = list[4 * row + col]
