@@ -43,7 +43,7 @@ InvSbox: list[list[int]] = [
     [23, 43, 4, 126, 186, 119, 214, 38, 225, 105, 20, 99, 85, 33, 12, 125]
 ]
 
-Rcon: list[int] = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36]  # ??? - co to jest
+RoundConst: list[int] = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36]
 
 MixColumnsMatrix: list[list[int]] = [
     [2, 3, 1, 1],
@@ -78,28 +78,27 @@ def keyGen(keySize: int) -> str:
 def keyExpansion(key) -> (list[list[int]], int):
     keySize: int = len(key)
 
-    Nk: int = keySize // 4  # ??? - co to jest
-    numOfRounds: int = Nk + 6
+    keyNum: int = keySize // 4
+    numOfRounds: int = keyNum + 6
 
     w: list[list[int]] = []  # ???
-    for i in range(Nk):
+    for i in range(keyNum):
         w.append([ord(key[4 * i + j]) for j in range(4)])
 
-    # ??? - co to robi
-    def g(word: list[int], round: int) -> list[int]:
+    def expandKey(word: list[int], round: int) -> list[int]:
         word: list[int] = word[1:] + word[:1]
         for i in range(4):
             row: int = word[i] // 16
             col: int = word[i] % 16
             word[i] = Sbox[row][col]
-        word[0] = word[0] ^ Rcon[round]
+        word[0] = word[0] ^ RoundConst[round]
         return word
 
-    for i in range(Nk, 4 * (numOfRounds + 1)):
-        if i % Nk == 0:
-            w.append([w[i - Nk][j] ^ g(w[i - 1], i // Nk)[j] for j in range(4)])
+    for i in range(keyNum, 4 * (numOfRounds + 1)):
+        if i % keyNum == 0:
+            w.append([w[i - keyNum][j] ^ expandKey(w[i - 1], i // keyNum)[j] for j in range(4)])
         else:
-            w.append([w[i - Nk][j] ^ w[i - 1][j] for j in range(4)])
+            w.append([w[i - keyNum][j] ^ w[i - 1][j] for j in range(4)])
 
     return w, numOfRounds
 
@@ -239,10 +238,10 @@ def hexCipherToState(cipher: str) -> list[list[list[int]]]:
 
 
 # Na razie proponuję tylko ECB
-def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None):
+def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None) -> str:
     # if mode == "ECB":
     blocks: list[list[list[int]]] = plaintextToState(plaintext)
-    w: list[list[int]]  # ???
+    w: list[list[int]]
     numOfRounds: int
     w, numOfRounds = keyExpansion(key)
     for block in blocks:
@@ -284,7 +283,7 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None):
 
 def decryption(cipher: str, key: str, mode: str = "ECB", IV=None) -> str:
     # if mode == "ECB":
-    w: list[list[int]]  # ???
+    w: list[list[int]]
     numOfRounds: int
     w, numOfRounds = keyExpansion(key)
     blocks = hexCipherToState(cipher)
@@ -332,20 +331,20 @@ def hex_to_ascii(hex_string: str) -> str:
 
 if __name__ == '__main__':
     # key = keyGen(128)
-    key_hex = "000102030405060708090a0b0c0d0e0f"
-    plaintext_hex = "00112233445566778899aabbccddeeff"
-    key = hex_to_ascii(key_hex)
-    plaintext = hex_to_ascii(plaintext_hex)
+    key_hex: str = "000102030405060708090a0b0c0d0e0f"
+    plaintext_hex: str = "00112233445566778899aabbccddeeff"
+    key: str = hex_to_ascii(key_hex)
+    plaintext: str = hex_to_ascii(plaintext_hex)
     print("Klucz ", key.encode('latin1').hex())
     print("Plaintext :", plaintext.encode('latin1').hex())
 
     # Ataki przeprowadaza się tak samo w CBC i ECB (?)
     # Więc proponuję tylko ECb (łatwiej)
 
-    cipher, iv = encryption(plaintext, key)
+    cipher : str = encryption(plaintext, key)
     print("Zaszyfrowany tekst:", cipher)
 
-    decrypted = decryption(cipher, key)
+    decrypted : str = decryption(cipher, key)
     print("Odszyfrowany tekst :", decrypted.encode('latin1').hex())
 
     print(plaintext == decrypted)
