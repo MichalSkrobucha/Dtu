@@ -75,7 +75,7 @@ def keyGen(keySize: int) -> str:
     return key
 
 
-def keyExpansion(key) -> (list[list[int]], int):
+def keyExpansion(key: str) -> (list[list[int]], int):
     keySize: int = len(key)
 
     keyNum: int = keySize // 4
@@ -255,7 +255,7 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None) -> str:
         block = shiftRows(block)
         block = addRoundKey(block, w, numOfRounds)
     cipher: str = stateToHexCipher(blocks)
-    return cipher, IV
+    return cipher
 
 
 # elif mode == "CBC":
@@ -278,7 +278,7 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None) -> str:
 #         block = addRoundKey(block, w, Nr)
 #         IV = block
 #     cipher = stateToHexCipher(blocks)
-#     return cipher, nIV
+#     return cipher
 
 
 def decryption(cipher: str, key: str, mode: str = "ECB", IV=None) -> str:
@@ -339,12 +339,12 @@ if __name__ == '__main__':
     print("Plaintext :", plaintext.encode('latin1').hex())
 
     # Ataki przeprowadaza się tak samo w CBC i ECB (?)
-    # Więc proponuję tylko ECb (łatwiej)
+    # Więc proponuję tylko ECB (łatwiej)
 
-    cipher : str = encryption(plaintext, key)
+    cipher: str = encryption(plaintext, key)
     print("Zaszyfrowany tekst:", cipher)
 
-    decrypted : str = decryption(cipher, key)
+    decrypted: str = decryption(cipher, key)
     print("Odszyfrowany tekst :", decrypted.encode('latin1').hex())
 
     print(plaintext == decrypted)
