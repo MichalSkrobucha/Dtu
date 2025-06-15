@@ -1,5 +1,4 @@
 1. Napisać wstęp teoretyczny
-
 2. Opis teoretyczny ataków.
 Wybrane ataki:
 Atak 1: DFA na ostatnią rundę AES (klasyczny atak Piret–Quisquater)
@@ -8,21 +7,22 @@ Atak 2: Random Fault Injection Attack (losowe błędy w stanie)
 https://eprint.iacr.org/2003/010.pdf
 Atak 3: Safe-Error Attack (atak wykrywający błędy poprzez "zawieszanie" działania algorytmu)
 https://cyber.gouv.fr/sites/default/files/IMG/pdf/Fault_Attacks_on_AES_with_Faulty_Ciphertexts_Only.pdf
-
-
-
 #PREZENTACJA tam omówione ataki +DFA na ostatnią rundę AES
 DFA na ostatnią rundę AES
 Injection Attack na S-Box AES​
-
-
-Reset bajtu klucza podczas transferu [Julia]
+Reset bajtu klucza podczas transferu
 
 
 3. Implementacja ataków w Pythonie
-
+DFA na ostatnią rundę AES [Michał]
+* inverse Key Schedule
+Injection Attack na S-Box AES​ [Konrad]
 Reset bajtu klucza podczas transferu [Julia]
-4. Opracowanie zabezpieczeń, testowanie + implementacja 
+
+4. Opracowanie zabezpieczeń, testowanie + implementacja
+DFA na ostatnią rundę AES [Michał]
+Injection Attack na S-Box AES​ [Konrad]
+Reset bajtu klucza podczas transferu [Julia]
 
 5. Opis teoretyczny zabezpieczeń
 6. Wnioski + podsumowanie
