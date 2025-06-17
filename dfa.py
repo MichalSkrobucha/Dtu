@@ -138,6 +138,18 @@ def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
     allKeys = [[0, 0, 0, 0] for _ in range(howManyKeys)]
     allKeys[-4:] = lastKey
 
+    # 0 [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
+    # 1 [[214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254]]
+    # 2 [[182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254]]
+    # 3 [[182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65]]
+    # 4 [[71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253]]
+    # 5 [[60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170]]
+    # 6 [[94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107]]
+    # 7 [[20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38]]
+    # 8 [[71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210]]
+    # 9 [[84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78]]
+    # 10 [[19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
+
     def expandKey(word: list[int], round: int) -> list[int]:
         word: list[int] = word[1:] + word[:1]
         for i in range(4):
@@ -147,14 +159,15 @@ def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
         word[0] = word[0] ^ RoundConst[round]
         return word
 
-    for i in range(howManyKeys - keyNum - 1, -1, -1):
-        if i % keyNum != 0:
+    for i in range(howManyKeys - 5, -1, -1):
+
+        if i % 4 != 0:
 
             for j in range(4):
                 allKeys[i][j] = allKeys[i + keyNum][j] ^ allKeys[i + keyNum - 1][j]
 
         else:
-            expanded: list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum + 1)
+            expanded : list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum + 1)
 
             for j in range(4):
                 allKeys[i][j] = allKeys[i + keyNum][j] ^ expanded[j]
@@ -163,26 +176,18 @@ def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
 
 
 if __name__ == '__main__':
-    key_hex: str = ''.join(choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'])
-                           for _ in range(32))
-    print(key_hex)
+    key_hex: str = ''.join(choice("0123456789abcdef") for _ in range(32))
+    key_hex: str = "000102030405060708090a0b0c0d0e0f"
     plaintext_hex: str = "00112233445566778899aabbccddeeff"
     key: str = aes.hex_to_ascii(key_hex)
-
     plaintext: str = aes.hex_to_ascii(plaintext_hex)
-    # print("Klucz ", key.encode('latin1').hex())
-    # print("Plaintext :", plaintext.encode('latin1').hex())
-
     correct: str = aes.encryption(plaintext, key)
-    # print("Zaszyfrowany tekst:", correct)
 
-    DFArow: int = randint(0, 3)
-    DFAcol: int = randint(0, 3)
-    DFAval: int = randint(1, 255)  # to musi być znane
+    DFArow: int
+    DFAcol: int
+    DFAval: int # to musi być znane
 
     lastKeyCandidates: list[list[list[int]]] = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
-
-    # print(correct)
 
     possibleKeys: list[int] = []
 
@@ -233,12 +238,4 @@ if __name__ == '__main__':
 
     lastRoundKey = [[b[0] for b in w] for w in lastKeyCandidates]
 
-    # print(lastRoundKey)
-
-    mainKey: list[list[int]] = invKeySchedule(lastRoundKey, len(key_hex) // 8)
-
-    for w in mainKey:
-        for x in w:
-            print(str(hex(x))[2:].rjust(2, '0'), end='')
-
-    # encryptionDFARedundant(plaintext, key, DFArow, DFAcol, DFAval)
+    print(invKeySchedule(lastRoundKey, 4))
