@@ -26,22 +26,22 @@ Sbox1: list[list[int]] = [
 ]
 
 Sbox_dmg: list[list[int]] = [
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
-    [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118],
+    [183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21],
+    [4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235, 39, 178, 117],
+    [9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227, 47, 132],
+    [83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207],
+    [183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21],
+    [4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235, 39, 178, 117],
+    [9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227, 47, 132],
+    [83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207],
+    [183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21],
+    [4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235, 39, 178, 117],
+    [9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227, 47, 132],
+    [83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207],
+    [183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21],
+    [4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235, 39, 178, 117],
+    [9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227, 47, 132],
+    [83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207],
 ]
 
 
@@ -53,7 +53,7 @@ def flatten_sbox(sbox_2d):
 def check_sbox_hash(sbox, known_hash_hex):
     current_hash = hashlib.sha256(bytes(flatten_sbox(sbox))).hexdigest()
     if current_hash != known_hash_hex:
-        print("[!!!] Wykryto manipulację w S-boxie (HASH NIEZGODNY)")
+        print("[!!] Wykryto manipulację w S-boxie (HASH NIEZGODNY)")
         return False
     return True
 
@@ -70,19 +70,19 @@ def custom_sbox_subbytes(state, sbox_2d):
 def safe_subbytes_with_verification(state, sboxes):
     results = []
     for sbox in sboxes:
-        temp_state = copy.deepcopy(state)  # Unikamy in-place modyfikacji
-        result = custom_sbox_subbytes(temp_state, sbox)
+        # Użyj głębokiej kopii stanu, aby nie nadpisać oryginału
+        state_copy = copy.deepcopy(state)
+        result = custom_sbox_subbytes(state_copy, sbox)
         results.append(result)
 
     # Porównaj wszystkie wyniki
     first = results[0]
     for res in results[1:]:
         if res != first:
-            print("[!!!] Wykryto niespójność wyników subBytes – możliwa manipulacja S-boxem!")
+            print("[!!!!!] Wykryto niespójność wyników subBytes – możliwa manipulacja S-boxem!")
             return res, False
 
     return first, True
-
 
 def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None, security: str = "safe", faulty_round: int | None = None) -> str:
     blocks: list[list[list[int]]] = plaintextToState(plaintext)
@@ -147,13 +147,13 @@ if __name__ == '__main__':
     print("Klucz ", key.encode('latin1').hex())
     print("Plaintext :", plaintext.encode('latin1').hex())
 
-    cipher: str = encryption(plaintext, key, security="safe", faulty_round=1)
+    cipher: str = encryption(plaintext, key, security="safe", faulty_round=2)
     print("Zaszyfrowany tekst:", cipher)
 
     decrypted: str = decryption(cipher, key)
     print("Odszyfrowany tekst :", decrypted.encode('latin1').hex())
 
-    cipher: str = encryption(plaintext, key, security="efficient", faulty_round=1)
+    cipher: str = encryption(plaintext, key, security="efficient", faulty_round=2)
     print("Zaszyfrowany tekst:", cipher)
 
     decrypted: str = decryption(cipher, key)
