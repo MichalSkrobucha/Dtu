@@ -1,7 +1,8 @@
 from random import randint
 
+import aes
 from aes import plaintextToState, keyExpansion, addRoundKey, subBytes, shiftRows, mixColumns, stateToHexCipher, \
-    hex_to_ascii, encryption, hexCipherToState, InvSbox, RoundConst, Sbox
+    hexCipherToState, RoundConst, Sbox
 
 
 def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: int, mode: str = "ECB", IV=None) -> str:
@@ -23,8 +24,8 @@ def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: in
 
         # ostatnia runda
         # Fault injection
-        print(f'Atak na element ({DFArow}, {DFAcol}) maską xor {hex(DFAval)}')
-        print(f'Poprawna wartość klucza: {hex(w[-4:][(DFAcol - DFArow) % 4][DFArow])}')
+        # print(f'Atak na element ({DFArow}, {DFAcol}) maską xor {hex(DFAval)}')
+        # print(f'Poprawna wartość klucza: {hex(w[-4:][(DFAcol - DFArow) % 4][DFArow])}')
         block[DFArow][DFAcol] ^= DFAval
 
         block = subBytes(block)
@@ -94,7 +95,7 @@ def encryptionDFARedundant(plaintext: str, key: str, DFArow: int, DFAcol: int, D
     return cipher
 
 
-def recoverRoundKey(correct: str, attacked: str, DFAval: int) -> tuple[int, int, int]:
+def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[list[int], int, int]:
     cor: list[list[list[int]]] = hexCipherToState(correct)
     att: list[list[list[int]]] = hexCipherToState(attacked)
 
@@ -114,33 +115,40 @@ def recoverRoundKey(correct: str, attacked: str, DFAval: int) -> tuple[int, int,
         if breaker:
             break
 
-    # print(row, col, delta)
-
-    def invSBox(val: int) -> int:
-        row: int = val // 16
-        col: int = val % 16
-        return InvSbox[row][col]
+    def invS(val: int) -> int:
+        return aes.InvSbox[val // 16][val % 16]
 
     cVal: int = cor[0][row][col]
     aVal: int = att[0][row][col]
 
-    # rzeczywista kolumna wstrzyknięcia błędu - przed ShiftRows
-    col += row
-    col %= 4
+    # print(row, col, hex(cVal), hex(aVal))
+
+    possibleKeys: list[int] = []
 
     for key in range(256):
-        if (invSBox(key ^ cVal) ^ invSBox(key ^ aVal)) == DFAval:
-            return key, row, col
+        if (invS(key ^ cVal) ^ invS(key ^ aVal)) == DFAval:
+            possibleKeys.append(key)
+
+    return possibleKeys, row, col
 
 
-def invKeySchedule(lastKey: list[int], keySize: int) -> str:
-    # keySchedule - w przód
-    keyNum: int = keySize // 4
-    numOfRounds: int = keyNum + 6
+def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
+    howManyKeys: int = 4 * (keyNum + 8)
 
-    w: list[list[int]] = []  # ???
-    for i in range(keyNum):
-        w.append([ord(key[4 * i + j]) for j in range(4)])
+    allKeys = [[0, 0, 0, 0] for _ in range(howManyKeys)]
+    allKeys[-4:] = lastKey
+
+    # 0 [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
+    # 1 [[214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254]]
+    # 2 [[182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254]]
+    # 3 [[182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65]]
+    # 4 [[71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253]]
+    # 5 [[60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170]]
+    # 6 [[94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107]]
+    # 7 [[20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38]]
+    # 8 [[71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210]]
+    # 9 [[84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78]]
+    # 10 [[19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
 
     def expandKey(word: list[int], round: int) -> list[int]:
         word: list[int] = word[1:] + word[:1]
@@ -151,78 +159,95 @@ def invKeySchedule(lastKey: list[int], keySize: int) -> str:
         word[0] = word[0] ^ RoundConst[round]
         return word
 
-    for i in range(keyNum, 4 * (numOfRounds + 1)):
-        if i % keyNum == 0:
-            w.append([w[i - keyNum][j] ^ expandKey(w[i - 1], i // keyNum)[j] for j in range(4)])
+    for i in range(howManyKeys - 5, -1, -1):
+
+        if i % 4 != 0 or i == 0:
+
+            for j in range(4):
+                allKeys[i][j] = allKeys[i + keyNum][j] ^ allKeys[i + keyNum - 1][j]
+
         else:
-            w.append([w[i - keyNum][j] ^ w[i - 1][j] for j in range(4)])
+            expanded : list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum)
 
-    key_schedule_words = [0] * ((numOfRounds + 1) * keyNum)
+            for j in range(4):
+                allKeys[i][j] = allKeys[i + keyNum][j] ^ expanded[j]
 
-    return ''
+            print(allKeys[i:i+4])
 
-    # invKeySchedule
-
-# https://crypto.stackexchange.com/questions/31459/aes-inverse-key-schedule
-
-# https://web.archive.org/web/20190629185148/https://github.com/cmcqueen/aes-min/blob/master/aes-min.c#L393
-# static void aes128_key_schedule_inv_round(uint8_t p_key[AES128_KEY_SIZE], uint8_t rcon)
-# {
-#     uint_fast8_t    round;
-#     uint8_t       * p_key_0 = p_key + AES128_KEY_SIZE - AES_KEY_SCHEDULE_WORD_SIZE;
-#     uint8_t       * p_key_m1 = p_key_0 - AES_KEY_SCHEDULE_WORD_SIZE;
-#
-#     for (round = 1; round < AES128_KEY_SIZE / AES_KEY_SCHEDULE_WORD_SIZE; ++round)
-#     {
-#         /* XOR in previous word */
-#         p_key_0[0] ^= p_key_m1[0];
-#         p_key_0[1] ^= p_key_m1[1];
-#         p_key_0[2] ^= p_key_m1[2];
-#         p_key_0[3] ^= p_key_m1[3];
-#
-#         p_key_0 = p_key_m1;
-#         p_key_m1 -= AES_KEY_SCHEDULE_WORD_SIZE;
-#     }
-#
-#     /* Rotate previous word and apply S-box. Also XOR Rcon for first byte. */
-#     p_key_m1 = p_key + AES128_KEY_SIZE - AES_KEY_SCHEDULE_WORD_SIZE;
-#     p_key_0[0] ^= aes_sbox(p_key_m1[1]) ^ rcon;
-#     p_key_0[1] ^= aes_sbox(p_key_m1[2]);
-#     p_key_0[2] ^= aes_sbox(p_key_m1[3]);
-#     p_key_0[3] ^= aes_sbox(p_key_m1[0]);
-# }
-
-
+    return allKeys[:keyNum]
 
 
 if __name__ == '__main__':
-    # key = keyGen(128)
+    # # key = keyGen(128)
     key_hex: str = "000102030405060708090a0b0c0d0e0f"
     plaintext_hex: str = "00112233445566778899aabbccddeeff"
-    key: str = hex_to_ascii(key_hex)
-    plaintext: str = hex_to_ascii(plaintext_hex)
+    key: str = aes.hex_to_ascii(key_hex)
+    plaintext: str = aes.hex_to_ascii(plaintext_hex)
     # print("Klucz ", key.encode('latin1').hex())
     # print("Plaintext :", plaintext.encode('latin1').hex())
 
-    correct: str = encryption(plaintext, key)
+    correct: str = aes.encryption(plaintext, key)
     # print("Zaszyfrowany tekst:", correct)
 
     DFArow: int = randint(0, 3)
     DFAcol: int = randint(0, 3)
     DFAval: int = randint(1, 255)  # to musi być znane
 
-    lastKey: list[int] = []
+    lastKeyCandidates: list[list[list[int]]] = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
+
+    # print(correct)
+
+    possibleKeys: list[int] = []
 
     for i in range(16):
-        DFAval: int = randint(1, 255)  # to musi być znane
+        DFAval = randint(1, 255)
         attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
         # print("Zaszyfrowany tekst:", attacked)
 
-        DFAval, DFArow, DFAcol = recoverRoundKey(correct, attacked, DFAval)
-        print(f'Znaleziono bajt klucza: {hex(DFAval)} na pozycji ({DFArow}, {DFAcol})')
+        # print(attacked)
 
-        lastKey.append(DFAval)
+        possibleKeys, DFArow, DFAcol = recoverFragmentOfLastKey(correct, attacked, DFAval)
+        # print(f'Znaleziono bajt klucza: {DFAval} w word {DFAcol}, o indeksie {DFArow}')
 
-    print(f'Klucz ostatniej rundy: {[hex(v) for v in lastKey]}')
+        lastKeyCandidates[DFAcol][DFArow] = possibleKeys
+
+    # print(lastKeyCandidates)
+
+    manyValues: bool = False
+
+    for w in lastKeyCandidates:
+        for b in w:
+            if len(b) > 1:
+                manyValues = True
+                break
+
+    while manyValues:
+        manyValues = False
+
+        for i in range(16):
+            DFAval = randint(1, 255)
+            attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
+            # print("Zaszyfrowany tekst:", attacked)
+
+            # print(attacked)
+
+            possibleKeys, DFArow, DFAcol = recoverFragmentOfLastKey(correct, attacked, DFAval)
+            # print(f'Znaleziono bajt klucza: {DFAval} w word {DFAcol}, o indeksie {DFArow}')
+
+            lastKeyCandidates[DFAcol][DFArow] = list(set(possibleKeys) & set(lastKeyCandidates[DFAcol][DFArow]))
+
+        # print(lastKeyCandidates)
+
+        for w in lastKeyCandidates:
+            for b in w:
+                if len(b) > 1:
+                    manyValues = True
+                    break
+
+    lastRoundKey = [[b[0] for b in w] for w in lastKeyCandidates]
+
+    print(lastRoundKey)
+
+    invKeySchedule(lastRoundKey, 4)
 
     # encryptionDFARedundant(plaintext, key, DFArow, DFAcol, DFAval)
