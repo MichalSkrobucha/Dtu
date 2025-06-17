@@ -1,4 +1,4 @@
-from random import randint
+from random import randint, choice
 
 import aes
 from aes import plaintextToState, keyExpansion, addRoundKey, subBytes, shiftRows, mixColumns, stateToHexCipher, \
@@ -133,7 +133,7 @@ def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[
 
 
 def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
-    howManyKeys: int = 4 * (keyNum + 8)
+    howManyKeys: int = 4 * (keyNum + 7)
 
     allKeys = [[0, 0, 0, 0] for _ in range(howManyKeys)]
     allKeys[-4:] = lastKey
@@ -161,41 +161,33 @@ def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
 
     for i in range(howManyKeys - 5, -1, -1):
 
-        if i % 4 != 0 or i == 0:
+        if i % 4 != 0:
 
             for j in range(4):
                 allKeys[i][j] = allKeys[i + keyNum][j] ^ allKeys[i + keyNum - 1][j]
 
         else:
-            expanded : list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum)
+            expanded : list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum + 1)
 
             for j in range(4):
                 allKeys[i][j] = allKeys[i + keyNum][j] ^ expanded[j]
-
-            print(allKeys[i:i+4])
 
     return allKeys[:keyNum]
 
 
 if __name__ == '__main__':
-    # # key = keyGen(128)
+    key_hex: str = ''.join(choice("0123456789abcdef") for _ in range(32))
     key_hex: str = "000102030405060708090a0b0c0d0e0f"
     plaintext_hex: str = "00112233445566778899aabbccddeeff"
     key: str = aes.hex_to_ascii(key_hex)
     plaintext: str = aes.hex_to_ascii(plaintext_hex)
-    # print("Klucz ", key.encode('latin1').hex())
-    # print("Plaintext :", plaintext.encode('latin1').hex())
-
     correct: str = aes.encryption(plaintext, key)
-    # print("Zaszyfrowany tekst:", correct)
 
-    DFArow: int = randint(0, 3)
-    DFAcol: int = randint(0, 3)
-    DFAval: int = randint(1, 255)  # to musi być znane
+    DFArow: int
+    DFAcol: int
+    DFAval: int # to musi być znane
 
     lastKeyCandidates: list[list[list[int]]] = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
-
-    # print(correct)
 
     possibleKeys: list[int] = []
 
@@ -246,8 +238,4 @@ if __name__ == '__main__':
 
     lastRoundKey = [[b[0] for b in w] for w in lastKeyCandidates]
 
-    print(lastRoundKey)
-
-    invKeySchedule(lastRoundKey, 4)
-
-    # encryptionDFARedundant(plaintext, key, DFArow, DFAcol, DFAval)
+    print(invKeySchedule(lastRoundKey, 4))
