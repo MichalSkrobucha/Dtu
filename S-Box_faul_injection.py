@@ -90,10 +90,11 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None, security: s
     numOfRounds: int
     w, numOfRounds = keyExpansion(key)
 
-    for block_index, block in enumerate(blocks):
+    for block_index in range(len(blocks)):
+        block = blocks[block_index]  # teraz jawnie modyfikujemy ten blok
+
         block = addRoundKey(block, w, 0)
         for i in range(1, numOfRounds):
-            # Wybór S-boxa na podstawie wskazanej rundy
             use_damaged = (i == faulty_round)
             sbox_to_use = Sbox_dmg if use_damaged else Sbox1
 
@@ -103,11 +104,11 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None, security: s
                 block = custom_sbox_subbytes(block, sbox_to_use)
 
             elif security == "efficient":
-                # W trybie safe porównujemy więcej niż jeden S-box, tylko jeden z nich może być z błędem
                 sboxes = [Sbox1, Sbox1, Sbox_dmg] if use_damaged else [Sbox1, Sbox1, Sbox1]
                 block, valid = safe_subbytes_with_verification(block, sboxes)
                 if not valid:
-                    print(f"[!!!] Blok {block_index}, runda {i}: Wykryto niespójność subBytes! Możliwa manipulacja S-boxem.")
+                    print(
+                        f"[!!!] Blok {block_index}, runda {i}: Wykryto niespójność subBytes! Możliwa manipulacja S-boxem.")
 
             block = shiftRows(block)
             block = mixColumns(block)
@@ -118,7 +119,7 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None, security: s
         sbox_to_use = Sbox_dmg if use_damaged else Sbox1
 
         if security == "safe":
-            if not check_sbox_hash(Sbox1, known_hash):
+            if not check_sbox_hash(sbox_to_use, known_hash):
                 print(f"[!] Blok {block_index}, ostatnia runda: Nieprawidłowy S-box!")
             block = custom_sbox_subbytes(block, sbox_to_use)
 
@@ -130,6 +131,7 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None, security: s
 
         block = shiftRows(block)
         block = addRoundKey(block, w, numOfRounds)
+        blocks[block_index] = block
 
     cipher: str = stateToHexCipher(blocks)
     return cipher
@@ -145,7 +147,7 @@ if __name__ == '__main__':
     print("Klucz ", key.encode('latin1').hex())
     print("Plaintext :", plaintext.encode('latin1').hex())
 
-    cipher: str = encryption(plaintext, key, security="safe", faulty_round=2)
+    cipher: str = encryption(plaintext, key, security="safe", faulty_round=1)
     print("Zaszyfrowany tekst:", cipher)
 
     decrypted: str = decryption(cipher, key)
