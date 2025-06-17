@@ -239,3 +239,4 @@ if __name__ == '__main__':
     lastRoundKey = [[b[0] for b in w] for w in lastKeyCandidates]
 
     print(invKeySchedule(lastRoundKey, 4))
+    print(lastRoundKey)
