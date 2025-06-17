@@ -34,12 +34,15 @@ AESsbox = [
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68,
     0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 ]
+
 sbox=SBox(AESsbox)
+
+
 print("Elementy analizy liniowej")
 print(sbox.linear_approximation_table())
 print("delta p:",sbox.maximal_linear_bias_relative())
 print("max|Taf|:",(sbox.maximal_linear_bias_absolute()))
-print("Lambda:",(sbox.maximal_linear_bias_absolute()/(2^(5-1))))
+print("Lambda:",(sbox.maximal_linear_bias_absolute()/(2^(8-1))))
 
 print("Elementy analizy różnicowej")
 print(sbox.difference_distribution_table())
@@ -47,13 +50,11 @@ print("delta=",sbox.maximal_difference_probability())
 print("Tdf=",sbox.maximal_difference_probability_absolute())
 
 print("Pozostałe elementy analizy")
-i=0
-for i in range (32):
-    if i==sbox[i]:
-        print("Punkt stały na",i)
-        i+=1
-    if i==0:
-        print("brak punktów stałych")
+# Znajdowanie punktów stałych w AES S-box
+fixed_points = [i for i in range(256) if AESsbox[i] == i]
+print("Liczba punktów stałych w AES S-box:", len(fixed_points))
+print("Punkty stałe:", fixed_points)
+
 
 i=0
 for i in range (256):
