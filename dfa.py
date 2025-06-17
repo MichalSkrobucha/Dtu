@@ -1,12 +1,11 @@
+import sys
 from random import randint
 
-import aes
 from aes import plaintextToState, keyExpansion, addRoundKey, subBytes, shiftRows, mixColumns, stateToHexCipher, \
-    hexCipherToState, RoundConst, Sbox
+    hexCipherToState, RoundConst, Sbox, hex_to_ascii, encryption, InvSbox
 
 
-def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: int, mode: str = "ECB", IV=None) -> str:
-    # if mode == "ECB":
+def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: int) -> str:
     blocks: list[list[list[int]]] = plaintextToState(plaintext)
     w: list[list[int]]
     numOfRounds: int
@@ -14,18 +13,13 @@ def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: in
     for block in blocks:
         block = addRoundKey(block, w, 0)
 
-        # rundy początkowe
-
         for i in range(1, numOfRounds):
             block = subBytes(block)
             block = shiftRows(block)
             block = mixColumns(block)
             block = addRoundKey(block, w, i)
 
-        # ostatnia runda
-        # Fault injection
-        # print(f'Atak na element ({DFArow}, {DFAcol}) maską xor {hex(DFAval)}')
-        # print(f'Poprawna wartość klucza: {hex(w[-4:][(DFAcol - DFArow) % 4][DFArow])}')
+        # Fault Injection
         block[DFArow][DFAcol] ^= DFAval
 
         block = subBytes(block)
@@ -37,9 +31,8 @@ def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: in
     return cipher
 
 
-def encryptionDFARedundant(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: int,
-                           mode: str = "ECB", IV=None) -> str:
-    # if mode == "ECB":
+def encryptionDFARedundant(plaintext: str, key: str, DFArow: int = 0, DFAcol: int = 0, DFAval: int = 1,
+                           DFA: bool = False, howManyRegRounsInRedundancy : int = 0) -> str:
     blocks: list[list[list[int]]] = plaintextToState(plaintext)
     w: list[list[int]]
     numOfRounds: int
@@ -47,15 +40,12 @@ def encryptionDFARedundant(plaintext: str, key: str, DFArow: int, DFAcol: int, D
     for block in blocks:
         block = addRoundKey(block, w, 0)
 
-        # rundy początkowe
-
-        for i in range(1, numOfRounds):
+        for i in range(1, numOfRounds - howManyRegRounsInRedundancy):
             block = subBytes(block)
             block = shiftRows(block)
             block = mixColumns(block)
             block = addRoundKey(block, w, i)
 
-        # kopiowanie wartości ostatniego obliczonego stany
         blockA: list[list[int]] = []
         blockB: list[list[int]] = []
 
@@ -68,9 +58,15 @@ def encryptionDFARedundant(plaintext: str, key: str, DFArow: int, DFAcol: int, D
                 blockB[-1].append(c)
 
         def computeRounds(b: list[list[int]], DFA: bool = False) -> list[list[int]]:
+
+            for i in range(numOfRounds - howManyRegRounsInRedundancy, numOfRounds):
+                b = subBytes(b)
+                b = shiftRows(b)
+                b = mixColumns(b)
+                b = addRoundKey(b, w, i)
+
             if DFA:
-                print(f'Atak na element ({DFArow}, {DFAcol}) maską xor {hex(DFAval)}')
-                print(f'Poprawna wartość klucza: {hex(w[-4:][(DFAcol - DFArow) % 4][DFArow])}')
+                # Fault Injection
                 b[DFArow][DFAcol] ^= DFAval
 
             b = subBytes(b)
@@ -79,16 +75,18 @@ def encryptionDFARedundant(plaintext: str, key: str, DFArow: int, DFAcol: int, D
 
         # 'Równioległe' liczenie ostatnich rund - z DFA ba B
         blockA = computeRounds(blockA)
-        blockB = computeRounds(blockB, DFA=True)
+        blockB = computeRounds(blockB, DFA)
 
         # porówanie wyników
         for i, (rA, rB) in enumerate(zip(blockA, blockB)):
             for j, (cA, cB) in enumerate(zip(rA, rB)):
                 if cA != cB:
-                    print(f'Znaleziono niezgodność bajcie ({i}, {j}), czyli ({i}, {(i + j) % 4}) przed ShiftRows')
+                    print(f'Znaleziono niezgodność bajcie ({i}, {j}), czyli ({i}, {(i + j) % 4}) przed ShiftRows',
+                          file=sys.stderr)
                     return '--- ERROR - POTENTIAL ATTACK DETECTED ---'
 
-        block = blockA
+        for i in range(4):
+            block[i] = blockA[i]
 
     cipher: str = stateToHexCipher(blocks)
 
@@ -103,6 +101,7 @@ def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[
     col: int = -1
     breaker: bool = False
 
+    # znalezienie miejsca błędu
     for r in range(4):
         for c in range(4):
             if cor[0][r][c] != att[0][r][c]:
@@ -116,15 +115,13 @@ def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[
             break
 
     def invS(val: int) -> int:
-        return aes.InvSbox[val // 16][val % 16]
+        return InvSbox[val // 16][val % 16]
 
     cVal: int = cor[0][row][col]
     aVal: int = att[0][row][col]
 
-    # print(row, col, hex(cVal), hex(aVal))
-
+    # znalezienie kandydatów na bajt klucza
     possibleKeys: list[int] = []
-
     for key in range(256):
         if (invS(key ^ cVal) ^ invS(key ^ aVal)) == DFAval:
             possibleKeys.append(key)
@@ -133,23 +130,12 @@ def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[
 
 
 def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
-    howManyKeys: int = 4 * (keyNum + 8)
+    howManyKeys: int = 4 * (keyNum + 7)
 
     allKeys = [[0, 0, 0, 0] for _ in range(howManyKeys)]
     allKeys[-4:] = lastKey
 
-    # 0 [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
-    # 1 [[214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254]]
-    # 2 [[182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254]]
-    # 3 [[182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65]]
-    # 4 [[71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253]]
-    # 5 [[60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170]]
-    # 6 [[94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107]]
-    # 7 [[20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38]]
-    # 8 [[71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210]]
-    # 9 [[84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78]]
-    # 10 [[19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
-
+    # expand key dla pierwszego klucza bloku
     def expandKey(word: list[int], round: int) -> list[int]:
         word: list[int] = word[1:] + word[:1]
         for i in range(4):
@@ -159,95 +145,58 @@ def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
         word[0] = word[0] ^ RoundConst[round]
         return word
 
+    # cofanie się w kluczach
     for i in range(howManyKeys - 5, -1, -1):
-
-        if i % 4 != 0 or i == 0:
-
+        if i % 4 != 0:
             for j in range(4):
                 allKeys[i][j] = allKeys[i + keyNum][j] ^ allKeys[i + keyNum - 1][j]
 
         else:
-            expanded : list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum)
-
+            expanded: list[int] = expandKey(allKeys[i + keyNum - 1], i // keyNum + 1)
             for j in range(4):
                 allKeys[i][j] = allKeys[i + keyNum][j] ^ expanded[j]
-
-            print(allKeys[i:i+4])
 
     return allKeys[:keyNum]
 
 
-if __name__ == '__main__':
-    # # key = keyGen(128)
-    key_hex: str = "000102030405060708090a0b0c0d0e0f"
-    plaintext_hex: str = "00112233445566778899aabbccddeeff"
-    key: str = aes.hex_to_ascii(key_hex)
-    plaintext: str = aes.hex_to_ascii(plaintext_hex)
-    # print("Klucz ", key.encode('latin1').hex())
-    # print("Plaintext :", plaintext.encode('latin1').hex())
+def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
+               plainTextHex: str = '00112233445566778899aabbccddeeff') -> str:
+    # key_hex: str = ''.join(choice("0123456789abcdef") for _ in range(32))
+    key: str = hex_to_ascii(keyHex)
+    plaintext: str = hex_to_ascii(plainTextHex)
+    correct: str = encryption(plaintext, key)
 
-    correct: str = aes.encryption(plaintext, key)
-    # print("Zaszyfrowany tekst:", correct)
+    DFArow: int
+    DFAcol: int
+    DFAval: int
 
-    DFArow: int = randint(0, 3)
-    DFAcol: int = randint(0, 3)
-    DFAval: int = randint(1, 255)  # to musi być znane
-
-    lastKeyCandidates: list[list[list[int]]] = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
-
-    # print(correct)
+    lastRoundKey: list[list[int]] = [[], [], [], []]
 
     possibleKeys: list[int] = []
 
     for i in range(16):
         DFAval = randint(1, 255)
         attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
-        # print("Zaszyfrowany tekst:", attacked)
-
-        # print(attacked)
 
         possibleKeys, DFArow, DFAcol = recoverFragmentOfLastKey(correct, attacked, DFAval)
-        # print(f'Znaleziono bajt klucza: {DFAval} w word {DFAcol}, o indeksie {DFArow}')
 
-        lastKeyCandidates[DFAcol][DFArow] = possibleKeys
-
-    # print(lastKeyCandidates)
-
-    manyValues: bool = False
-
-    for w in lastKeyCandidates:
-        for b in w:
-            if len(b) > 1:
-                manyValues = True
-                break
-
-    while manyValues:
-        manyValues = False
-
-        for i in range(16):
+        if len(possibleKeys) > 1:
             DFAval = randint(1, 255)
             attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
-            # print("Zaszyfrowany tekst:", attacked)
+            possibleKeys = list(set(recoverFragmentOfLastKey(correct, attacked, DFAval)[0]) & set(possibleKeys))
 
-            # print(attacked)
+        lastRoundKey[DFAcol].append(possibleKeys[0])
 
-            possibleKeys, DFArow, DFAcol = recoverFragmentOfLastKey(correct, attacked, DFAval)
-            # print(f'Znaleziono bajt klucza: {DFAval} w word {DFAcol}, o indeksie {DFArow}')
+    mainKey: list[list[int]] = invKeySchedule(lastRoundKey, 4)
 
-            lastKeyCandidates[DFAcol][DFArow] = list(set(possibleKeys) & set(lastKeyCandidates[DFAcol][DFArow]))
+    k: str = ''
 
-        # print(lastKeyCandidates)
+    for w in mainKey:
+        for b in w:
+            k += str(hex(b))[2:].rjust(2, '0')
 
-        for w in lastKeyCandidates:
-            for b in w:
-                if len(b) > 1:
-                    manyValues = True
-                    break
+    return k
 
-    lastRoundKey = [[b[0] for b in w] for w in lastKeyCandidates]
 
-    print(lastRoundKey)
-
-    invKeySchedule(lastRoundKey, 4)
-
-    # encryptionDFARedundant(plaintext, key, DFArow, DFAcol, DFAval)
+if __name__ == '__main__':
+    pass
