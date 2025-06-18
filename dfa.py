@@ -138,7 +138,7 @@ def encryptionDFARedundant(plaintext: str, key: str, DFA: bool = True,
     return cipher
 
 
-def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[list[int], int, int]:
+def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int, candidates : list[int] | None = None) -> tuple[list[int], int, int]:
     cor: list[list[list[int]]] = hexCipherToState(correct)
     att: list[list[list[int]]] = hexCipherToState(attacked)
 
@@ -165,9 +165,12 @@ def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int) -> tuple[
     cVal: int = cor[0][row][col]
     aVal: int = att[0][row][col]
 
+    if candidates is None:
+        candidates = range(256)
+
     # znalezienie kandydatów na bajt klucza
     possibleKeys: list[int] = []
-    for key in range(256):
+    for key in candidates:
         if (invS(key ^ cVal) ^ invS(key ^ aVal)) == DFAval:
             possibleKeys.append(key)
 
@@ -232,14 +235,14 @@ def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
 
         possibleKeys, DFArow, DFAcol = recoverFragmentOfLastKey(correct, attacked, DFAval)
 
-        print(f'Atak na bajt klucza {DFArow} {DFAcol}')
+        print(f'Atak na bajt klucza ({DFAcol}, {DFArow})')
         print(attacked)
         print(f'Możliwe bajty klucza : {possibleKeys}')
 
         if len(possibleKeys) > 1:
             DFAval = randint(1, 255)
             attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
-            possibleKeys = list(set(recoverFragmentOfLastKey(correct, attacked, DFAval)[0]) & set(possibleKeys))
+            possibleKeys = recoverFragmentOfLastKey(correct, attacked, DFAval, possibleKeys)[0]
             print(attacked)
             print(f'Możliwe bajty klucza : {possibleKeys}')
 
