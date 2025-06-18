@@ -24,22 +24,8 @@ def KeyResetAttack(key, plaintext):
     print("Liczba wszystkich bitów", len(binary1))
     print("Liczba zgodnych bitów",x)
 
-def detect_duplicate_cipher_blocks(ciphertext: bytes, block_size: int = 16) -> bool:
-    """Wykrywa powtarzające się bloki w szyfrogramie (np. dla CBC bez losowego IV)."""
-    blocks = [ciphertext[i:i+block_size] for i in range(0, len(ciphertext), block_size)]
-    unique_blocks = set(blocks)
-    return len(unique_blocks) != len(blocks)  # True jeśli są duplikaty
 
-def secure_encrypt_cbc(plaintext: bytes, key: bytes) -> bytes:
-    """Szyfruje plaintext w CBC z losowym IV i dokleja IV na początek."""
-    iv = os.urandom(16)  # 128-bitowy IV
-    ciphertext = encrypt_cbc(plaintext, key, iv)
-    return iv + ciphertext  # IV || CIPHERTEXT
-def secure_decrypt_cbc(ciphertext_with_iv: bytes, key: bytes) -> bytes:
-    """Deszyfruje szyfrogram zakodowany jako IV || CIPHERTEXT"""
-    iv = ciphertext_with_iv[:16]
-    ciphertext = ciphertext_with_iv[16:]
-    return decrypt_cbc(ciphertext, key, iv)
+
 
 
 key_hex = "000102030405060708090a0b0c0d0e0f"
