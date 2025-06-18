@@ -53,7 +53,7 @@ def flatten_sbox(sbox_2d):
 def check_sbox_hash(sbox, known_hash_hex):
     current_hash = hashlib.sha256(bytes(flatten_sbox(sbox))).hexdigest()
     if current_hash != known_hash_hex:
-        print("[!!] Wykryto manipulację w S-boxie (HASH NIEZGODNY)")
+        print("[!] Wykryto manipulację w S-boxie (HASH NIEZGODNY)")
         return False
     return True
 
@@ -79,7 +79,7 @@ def safe_subbytes_with_verification(state, sboxes):
     first = results[0]
     for res in results[1:]:
         if res != first:
-            print("[!!!!!] Wykryto niespójność wyników subBytes – możliwa manipulacja S-boxem!")
+            print("[!!!] Wykryto niespójność wyników subBytes – możliwa manipulacja S-boxem!")
             return res, False
 
     return first, True
