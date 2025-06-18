@@ -158,3 +158,16 @@ if __name__ == '__main__':
 
     decrypted: str = decryption(cipher, key)
     print("Odszyfrowany tekst :", decrypted.encode('latin1').hex())
+
+    binary1 = ''.join(format(ord(b), '08b') for b in plaintext)
+    binary2 = ''.join(format(ord(b), '08b') for b in decrypted)
+    print("Wiadomość: ")
+    print(binary1)
+    print("Szyfr: ")
+    print(binary2)
+    x=0
+    for i in range(len(binary1)):
+        if binary1[i]==binary2[i]:
+            x+=1
+    print("Liczba wszystkich bitów", len(binary1))
+    print("Liczba zgodnych bitów",x)
