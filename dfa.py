@@ -23,7 +23,16 @@ def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None) -> str:
         block = addRoundKey(block, w, numOfRounds)
     cipher: str = stateToHexCipher(blocks)
 
-    print(f'Klucz ostatniej rundy {w[-4:]}')
+    print('Klucz ostatniej rundy')
+
+    for c in w[-4:]:
+        print('0x',end='')
+        for b in c:
+            print(str(hex(b))[2:].rjust(2, '0'), end='')
+
+        print('', end=' ')
+
+    print('')
 
     return cipher
 
@@ -138,7 +147,8 @@ def encryptionDFARedundant(plaintext: str, key: str, DFA: bool = True,
     return cipher
 
 
-def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int, candidates : list[int] | None = None) -> tuple[list[int], int, int]:
+def recoverFragmentOfLastKey(correct: str, attacked: str, DFAval: int, candidates: list[int] | None = None) -> tuple[
+    list[int], int, int]:
     cor: list[list[list[int]]] = hexCipherToState(correct)
     att: list[list[list[int]]] = hexCipherToState(attacked)
 
@@ -212,12 +222,14 @@ def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
     key: str = hex_to_ascii(keyHex)
     plaintext: str = hex_to_ascii(plainTextHex)
 
+    print('Plaintext')
+    print(plainTextHex)
     print(f'Klucz glówny')
     print(keyHex)
 
     correct: str = encryption(plaintext, key)
 
-    print('Poprwny szyfrogram')
+    print('Poprawny szyfrogram')
     print(correct)
 
     DFArow: int
@@ -237,19 +249,30 @@ def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
 
         print(f'Atak na bajt klucza ({DFAcol}, {DFArow})')
         print(attacked)
-        print(f'Możliwe bajty klucza : {possibleKeys}')
+        print(f'Możliwe bajty klucza : {['0x' + str(hex(b))[2:].rjust(2, '0') for b in possibleKeys]}. '
+              f'Dla maski 0x{str(hex(DFAval))[2:].rjust(2, '0')}')
 
         if len(possibleKeys) > 1:
             DFAval = randint(1, 255)
+
             attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
             possibleKeys = recoverFragmentOfLastKey(correct, attacked, DFAval, possibleKeys)[0]
             print(attacked)
-            print(f'Możliwe bajty klucza : {possibleKeys}')
+            print(f'Możliwe bajty klucza : {['0x' + str(hex(b))[2:].rjust(2, '0') for b in possibleKeys]}. '
+                  f'Dla maski 0x{str(hex(DFAval))[2:].rjust(2, '0')}')
 
         lastRoundKey[DFAcol].append(possibleKeys[0])
         print('')
 
-    print(f'Klucz ostaniej rundy : {lastRoundKey}')
+    print('Klucz ostatniej rundy')
+    for c in lastRoundKey:
+        print('0x',end='')
+        for b in c:
+            print(str(hex(b))[2:].rjust(2, '0'), end='')
+
+        print('', end=' ')
+
+    print('')
 
     mainKey: list[list[int]] = invKeySchedule(lastRoundKey, 4)
     k: str = ''
