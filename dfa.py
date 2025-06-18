@@ -1,6 +1,7 @@
-from threading import Thread
 from random import randint, choice
 from sys import stderr
+from threading import Thread
+
 from aes import plaintextToState, keyExpansion, addRoundKey, subBytes, shiftRows, mixColumns, stateToHexCipher, \
     hexCipherToState, RoundConst, Sbox, hex_to_ascii, InvSbox
 
@@ -112,8 +113,8 @@ def encryptionDFARedundant(plaintext: str, key: str, DFA: bool = True,
         # computeRounds(block, block=1)
 
         # Redundancja (zrónoleglenie obliczeń)
-        tA : Thread = Thread(target=computeRounds, args=(blockA, 1, DFA))
-        tB : Thread = Thread(target=computeRounds, args=(blockA, 0, DFA))
+        tA: Thread = Thread(target=computeRounds, args=(blockA, 0, DFA))
+        tB: Thread = Thread(target=computeRounds, args=(blockB, 1))
 
         tA.start()
         tB.start()
@@ -268,4 +269,6 @@ if __name__ == '__main__':
 
     getMainKey(key, plaintext)
 
-    print(encryptionDFARedundant(plaintext, key, DFA=True, DFArow=0, DFAcol=0, DFAval=1))
+    print(encryptionDFARedundant(plaintext, key,
+                                 DFA=True,
+                                 DFArow=randint(0, 3), DFAcol=randint(0, 3), DFAval=randint(1, 255)))
