@@ -1,8 +1,30 @@
-import sys
-from random import randint
-
+from threading import Thread
+from random import randint, choice
+from sys import stderr
 from aes import plaintextToState, keyExpansion, addRoundKey, subBytes, shiftRows, mixColumns, stateToHexCipher, \
-    hexCipherToState, RoundConst, Sbox, hex_to_ascii, encryption, InvSbox
+    hexCipherToState, RoundConst, Sbox, hex_to_ascii, InvSbox
+
+
+def encryption(plaintext: str, key: str, mode: str = "ECB", IV=None) -> str:
+    blocks: list[list[list[int]]] = plaintextToState(plaintext)
+    w: list[list[int]]
+    numOfRounds: int
+    w, numOfRounds = keyExpansion(key)
+    for block in blocks:
+        block = addRoundKey(block, w, 0)
+        for i in range(1, numOfRounds):
+            block = subBytes(block)
+            block = shiftRows(block)
+            block = mixColumns(block)
+            block = addRoundKey(block, w, i)
+        block = subBytes(block)
+        block = shiftRows(block)
+        block = addRoundKey(block, w, numOfRounds)
+    cipher: str = stateToHexCipher(blocks)
+
+    print(f'Klucz ostatniej rundy {w[-4:]}')
+
+    return cipher
 
 
 def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: int) -> str:
@@ -31,8 +53,9 @@ def encryptionDFA(plaintext: str, key: str, DFArow: int, DFAcol: int, DFAval: in
     return cipher
 
 
-def encryptionDFARedundant(plaintext: str, key: str, DFArow: int = 0, DFAcol: int = 0, DFAval: int = 1,
-                           DFA: bool = False, howManyRegRounsInRedundancy : int = 0) -> str:
+def encryptionDFARedundant(plaintext: str, key: str, DFA: bool = True,
+                           DFArow: int = 0, DFAcol: int = 0, DFAval: int = 1,
+                           howManyRegRounsInRedundancy: int = 0) -> str:
     blocks: list[list[list[int]]] = plaintextToState(plaintext)
     w: list[list[int]]
     numOfRounds: int
@@ -57,7 +80,7 @@ def encryptionDFARedundant(plaintext: str, key: str, DFArow: int = 0, DFAcol: in
                 blockA[-1].append(c)
                 blockB[-1].append(c)
 
-        def computeRounds(b: list[list[int]], DFA: bool = False) -> list[list[int]]:
+        def computeRounds(b: list[list[int]], block: int = 0, DFA: bool = False) -> list[list[int]]:
 
             for i in range(numOfRounds - howManyRegRounsInRedundancy, numOfRounds):
                 b = subBytes(b)
@@ -71,18 +94,39 @@ def encryptionDFARedundant(plaintext: str, key: str, DFArow: int = 0, DFAcol: in
 
             b = subBytes(b)
             b = shiftRows(b)
-            return addRoundKey(b, w, numOfRounds)
+            b = addRoundKey(b, w, numOfRounds)
 
-        # 'Równioległe' liczenie ostatnich rund - z DFA ba B
-        blockA = computeRounds(blockA)
-        blockB = computeRounds(blockB, DFA)
+            match block:
+                case 0:
+                    for j in range(4):
+                        blockA[j] = b[j]
+
+                case 1:
+                    for j in range(4):
+                        blockB[j] = b[j]
+
+            return b
+
+        # Rekomputacja ostatnich rund - z DFA ba A
+        # computeRounds(blockA, block=0, DFA = DFA)
+        # computeRounds(block, block=1)
+
+        # Redundancja (zrónoleglenie obliczeń)
+        tA : Thread = Thread(target=computeRounds, args=(blockA, 1, DFA))
+        tB : Thread = Thread(target=computeRounds, args=(blockA, 0, DFA))
+
+        tA.start()
+        tB.start()
+
+        tA.join()
+        tB.join()
 
         # porówanie wyników
         for i, (rA, rB) in enumerate(zip(blockA, blockB)):
             for j, (cA, cB) in enumerate(zip(rA, rB)):
                 if cA != cB:
                     print(f'Znaleziono niezgodność bajcie ({i}, {j}), czyli ({i}, {(i + j) % 4}) przed ShiftRows',
-                          file=sys.stderr)
+                          file=stderr)
                     return '--- ERROR - POTENTIAL ATTACK DETECTED ---'
 
         for i in range(4):
@@ -161,10 +205,16 @@ def invKeySchedule(lastKey: list[list[int]], keyNum: int) -> list[list[int]]:
 
 def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
                plainTextHex: str = '00112233445566778899aabbccddeeff') -> str:
-    # key_hex: str = ''.join(choice("0123456789abcdef") for _ in range(32))
     key: str = hex_to_ascii(keyHex)
     plaintext: str = hex_to_ascii(plainTextHex)
+
+    print(f'Klucz glówny')
+    print(keyHex)
+
     correct: str = encryption(plaintext, key)
+
+    print('Poprwny szyfrogram')
+    print(correct)
 
     DFArow: int
     DFAcol: int
@@ -173,6 +223,7 @@ def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
     lastRoundKey: list[list[int]] = [[], [], [], []]
 
     possibleKeys: list[int] = []
+    print('')
 
     for i in range(16):
         DFAval = randint(1, 255)
@@ -180,23 +231,41 @@ def getMainKey(keyHex: str = '000102030405060708090a0b0c0d0e0f',
 
         possibleKeys, DFArow, DFAcol = recoverFragmentOfLastKey(correct, attacked, DFAval)
 
+        print(f'Atak na bajt klucza {DFArow} {DFAcol}')
+        print(attacked)
+        print(f'Możliwe bajty klucza : {possibleKeys}')
+
         if len(possibleKeys) > 1:
             DFAval = randint(1, 255)
             attacked: str = encryptionDFA(plaintext, key, i // 4, i % 4, DFAval)
             possibleKeys = list(set(recoverFragmentOfLastKey(correct, attacked, DFAval)[0]) & set(possibleKeys))
+            print(attacked)
+            print(f'Możliwe bajty klucza : {possibleKeys}')
 
         lastRoundKey[DFAcol].append(possibleKeys[0])
+        print('')
+
+    print(f'Klucz ostaniej rundy : {lastRoundKey}')
 
     mainKey: list[list[int]] = invKeySchedule(lastRoundKey, 4)
-
     k: str = ''
-
     for w in mainKey:
         for b in w:
             k += str(hex(b))[2:].rjust(2, '0')
+
+    print('Klucz główny')
+    print(k)
+    print(keyHex)
+
+    print('')
 
     return k
 
 
 if __name__ == '__main__':
-    pass
+    key: str = ''.join(choice("0123456789abcdef") for _ in range(32))
+    plaintext: str = ''.join(choice("0123456789abcdef") for _ in range(32))
+
+    getMainKey(key, plaintext)
+
+    print(encryptionDFARedundant(plaintext, key, DFA=True, DFArow=0, DFAcol=0, DFAval=1))
